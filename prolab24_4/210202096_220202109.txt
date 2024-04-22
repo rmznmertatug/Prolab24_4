@@ -1,0 +1,692 @@
+
+import javax.swing.*;
+import java.awt.*;
+import static java.awt.Frame.MAXIMIZED_BOTH;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.PriorityQueue;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+public class OyunHarita extends JFrame {
+
+    public static final int CELL_SIZE = 10;
+    public static final double OBSTACLE_PROBABILITY = 0.05;
+    public int treasurecount;
+    public int foundcount;
+    public int steps;
+    public List<ImageIcon> treasures;
+    public List<String> finallist;
+    public List<String> list1;
+    public List<String> list2;
+    public List<String> list3;
+    public List<String> list4;
+    public JPanel gridPanel;
+    public JPanel[][] cells;
+    public int[][] occupied;
+    public List<MovingObstacle> movingObstacles;
+    public List<MovingObstacle2> movingObstacles2;
+    public Timer timer;
+    public Timer timer2;
+    private JPanel playerCell;
+    private int playerRow, playerCol;
+
+    public OyunHarita(int rows, int cols, boolean b) {
+
+        foundcount = 0;
+        treasurecount = 0;
+        steps = 0;
+        occupied = new int[rows][cols];
+        finallist = new ArrayList<>();
+        list1 = new ArrayList<>();
+        list2 = new ArrayList<>();
+        list3 = new ArrayList<>();
+        list4 = new ArrayList<>();
+        treasures = new ArrayList<>();
+        treasures.add(new ImageIcon("src\\main\\java\\bronze bar2.png"));
+        treasures.add(new ImageIcon("src\\main\\java\\iron bar2.png"));
+        treasures.add(new ImageIcon("src\\main\\java\\badge green2.png"));
+        treasures.add(new ImageIcon("src\\main\\java\\copper bar2.png"));
+        setTitle("Oyun");
+        double en = cols * CELL_SIZE * 3.5;
+        double boy = rows * CELL_SIZE * 2.7;
+        setSize((int) en, (int) boy);
+        setLocationRelativeTo(null);
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                occupied[i][j] = 0;
+            }
+
+        }
+
+        gridPanel = new JPanel(new GridLayout(rows, cols));
+        gridPanel.setBorder(BorderFactory.createEmptyBorder(1, 1, 1, 1));
+        gridPanel.setBackground(new Color(161, 161, 161));
+        add(gridPanel);
+
+        cells = new JPanel[rows][cols];
+        occupied = new int[rows][cols];
+        movingObstacles = new ArrayList<>();
+        movingObstacles2 = new ArrayList<>();
+
+        Random random = new Random();
+
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                JPanel cell = new JPanel();
+                cell.setBackground(new Color(211, 211, 211));
+                cell.setBorder(BorderFactory.createLineBorder(Color.WHITE));
+
+                if (random.nextDouble() < OBSTACLE_PROBABILITY) {
+                    if (col < cols / 2) {
+                        cell.setBackground(new Color(37, 124, 163));
+                        occupied[row][col] = 1;
+                    } else {
+                        cell.setBackground(new Color(255, 117, 24));
+                        occupied[row][col] = 1;
+                    }
+                }
+
+                gridPanel.add(cell);
+                cells[row][col] = cell;
+
+            }
+        }
+
+        timer = new Timer(400, e -> moveObstacles());
+        timer.start();
+        timer2 = new Timer(400, e -> moveObstacles2());
+        timer2.start();
+
+        createMovingObstacles(3, rows, cols);
+        createMovingObstacles2(3, rows, cols);
+        addTreasure(20, rows, cols);
+        addPlayer(rows, cols);
+
+        if (b) {
+            for (int i = 0; i < rows; i++) {
+                for (int j = 0; j < cols; j++) {
+                    cells[i][j].setVisible(false);
+                }
+
+            }
+        }
+
+    }
+
+    public void addPlayer(int rows, int cols) {
+        playerCell = new JPanel();
+        playerCell.setBackground(Color.MAGENTA);
+        playerCell.setPreferredSize(new Dimension(19000 / cols, 10500 / rows));
+
+        Random random = new Random();
+        do {
+            playerRow = random.nextInt(rows);
+            playerCol = random.nextInt(cols);
+        } while (occupied[playerRow][playerCol] == 1);
+
+        JPanel cell = cells[playerRow][playerCol];
+        cell.setLayout(new BorderLayout());
+        cell.add(playerCell, BorderLayout.CENTER);
+
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                if (cells[i][j].getBackground().equals(Color.ORANGE)) {
+                    occupied[i][j] = 0;
+                    treasurecount++;
+                }
+
+            }
+
+        }
+
+    }
+
+    public void addTreasure(int count, int rows, int cols) {
+        Random random = new Random();
+        for (int i = 0; i < count; i++) {
+            int row, col;
+            do {
+                row = random.nextInt(rows);
+                col = random.nextInt(cols);
+            } while (isObstacleCell(row, col) || isOccupiedByMovingObstacle(row, col) || isOccupiedByMovingObstacle2(row, col));
+            occupied[row][col] = 1;
+            ImageIcon treasure = treasures.get(i % 4);
+            JLabel treasureLabel = new JLabel(treasure);
+            treasureLabel.setVerticalAlignment(JLabel.TOP);
+            JPanel cell = cells[row][col];
+            cell.setBackground(Color.ORANGE);
+            cell.add(treasureLabel, BorderLayout.CENTER);
+        }
+    }
+
+    public void createMovingObstacles(int count, int rows, int cols) {
+        Random random = new Random();
+        for (int i = 0; i < count; i++) {
+            int row, col;
+            do {
+                row = random.nextInt(rows);
+                col = random.nextInt(cols);
+            } while (isObstacleCell(row, col));
+
+            occupied[row][col] = 1;
+            if (row > 0) {
+                occupied[row - 1][col] = 1;
+            }
+            if (row < rows - 1) {
+                occupied[row + 1][col] = 1;
+            }
+            if (row < rows - 2) {
+                occupied[row + 2][col] = 1;
+            }
+            if (row < rows - 3) {
+                occupied[row + 3][col] = 1;
+            }
+            if (row < rows - 4) {
+                occupied[row + 4][col] = 1;
+            }
+            if (col < cols - 1) {
+                occupied[row][col + 1] = 1;
+            }
+            if (col < cols - 1 && row > 0) {
+                occupied[row - 1][col + 1] = 1;
+            }
+            if (col < cols - 1 && row < rows - 1) {
+                occupied[row + 1][col + 1] = 1;
+            }
+            if (col < cols - 1 && row < rows - 2) {
+                occupied[row + 2][col + 1] = 1;
+            }
+            if (col < cols - 1 && row < rows - 3) {
+                occupied[row + 3][col + 1] = 1;
+            }
+            if (col < cols - 1 && row < rows - 4) {
+                occupied[row + 4][col + 1] = 1;
+            }
+
+            MovingObstacle obstacle = new MovingObstacle(row, col, cells);
+            movingObstacles.add(obstacle);
+            JPanel cell = cells[row][col];
+            cell.setBackground(Color.WHITE);
+        }
+    }
+
+    public void createMovingObstacles2(int count, int rows, int cols) {
+        Random random = new Random();
+        for (int i = 0; i < count; i++) {
+            int row, col;
+            do {
+                row = random.nextInt(rows);
+                col = random.nextInt(cols);
+            } while (isObstacleCell(row, col) || isOccupiedByMovingObstacle(row, col));
+
+            occupied[row][col] = 1;
+            if (col < cols - 1) {
+                occupied[row][col + 1] = 1;
+            }
+            if (col < cols - 2) {
+                occupied[row][col + 2] = 1;
+            }
+            if (col > 0) {
+                occupied[row][col - 1] = 1;
+            }
+            if (row < rows - 1) {
+                occupied[row + 1][col] = 1;
+            }
+            if (row < rows - 1 && col < cols - 1) {
+                occupied[row + 1][col + 1] = 1;
+            }
+            if (row < rows - 1 && col < cols - 2) {
+                occupied[row + 1][col + 2] = 1;
+            }
+            if (row < rows - 1 && col > 0) {
+                occupied[row + 1][col - 1] = 1;
+            }
+            MovingObstacle2 obstacle = new MovingObstacle2(row, col, cells);
+            movingObstacles2.add(obstacle);
+            JPanel cell = cells[row][col];
+            cell.setBackground(Color.WHITE);
+        }
+    }
+
+    public boolean isOccupiedByMovingObstacle2(int row, int col) {
+        for (MovingObstacle2 obstacle : movingObstacles2) {
+            if (obstacle.getRow() == row && obstacle.getCol() == col
+                    || obstacle.getRow() == row && obstacle.getCol() + 1 == col
+                    || obstacle.getRow() == row && obstacle.getCol() + 2 == col
+                    || obstacle.getRow() == row && obstacle.getCol() - 1 == col
+                    || obstacle.getRow() + 1 == row && obstacle.getCol() == col
+                    || obstacle.getRow() + 1 == row && obstacle.getCol() + 1 == col
+                    || obstacle.getRow() + 1 == row && obstacle.getCol() + 2 == col
+                    || obstacle.getRow() + 1 == row && obstacle.getCol() - 1 == col) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean isOccupiedByMovingObstacle(int row, int col) {
+        for (MovingObstacle obstacle : movingObstacles) {
+            if (obstacle.getRow() == row && obstacle.getCol() == col
+                    || obstacle.getRow() - 1 == row && obstacle.getCol() == col
+                    || obstacle.getRow() + 1 == row && obstacle.getCol() == col
+                    || obstacle.getRow() + 2 == row && obstacle.getCol() == col
+                    || obstacle.getRow() + 3 == row && obstacle.getCol() == col
+                    || obstacle.getRow() + 4 == row && obstacle.getCol() == col
+                    || obstacle.getRow() == row && obstacle.getCol() + 1 == col
+                    || obstacle.getRow() - 1 == row && obstacle.getCol() + 1 == col
+                    || obstacle.getRow() + 1 == row && obstacle.getCol() + 1 == col
+                    || obstacle.getRow() + 2 == row && obstacle.getCol() + 1 == col
+                    || obstacle.getRow() + 3 == row && obstacle.getCol() + 1 == col
+                    || obstacle.getRow() + 4 == row && obstacle.getCol() + 1 == col) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void moveObstacles() {
+        for (MovingObstacle obstacle : movingObstacles) {
+            obstacle.move();
+        }
+    }
+
+    public void moveObstacles2() {
+        for (MovingObstacle2 obstacle : movingObstacles2) {
+            obstacle.move();
+        }
+    }
+
+    public boolean isObstacleCell(int row, int col) {
+        if (row < 0 || row >= cells.length || col < 0 || col >= cells[0].length) {
+            return true;
+        }
+        JPanel cell = cells[row][col];
+        Color cellColor = cell.getBackground();
+        return cellColor.equals(new Color(37, 124, 163)) || cellColor.equals(new Color(255, 117, 24));
+    }
+
+    private void movePlayer(int newRow, int newCol) {
+        if (newRow >= 0 && newRow < cells.length && newCol >= 0 && newCol < cells[0].length && occupied[newRow][newCol] == 0) {
+            JPanel newCell = cells[newRow][newCol];
+            newCell.add(playerCell);
+            playerRow = newRow;
+            playerCol = newCol;
+            checkTreasure(newRow, newCol);
+            steps++;
+            makeCellsAroundPlayerVisible(newRow, newCol);
+            repaint();
+        }
+    }
+
+    private void checkTreasure(int row, int col) {
+        JPanel cell = cells[row][col];
+        Color cellColor = cell.getBackground();
+        Component[] components = cell.getComponents();
+        String a = components[0].toString();
+        if (cellColor.equals(Color.ORANGE)) {
+            foundcount++;
+            treasurecount--;
+            if (treasurecount == 0) {
+                if (a.contains("defaultIcon=src\\main\\java\\bronze bar2.png")) {
+                    list1.add("\nAltın sandık " + row + "," + col + " konumundan toplandı.");
+                } else if (a.contains("defaultIcon=src\\main\\java\\iron bar2.png")) {
+                    list2.add("\nGümüş sandık " + row + "," + col + " konumundan toplandı.");
+                } else if (a.contains("defaultIcon=src\\main\\java\\badge green2.png")) {
+                    list3.add("\nZümrüt sandık " + row + "," + col + " konumundan toplandı.");
+                } else if (a.contains("defaultIcon=src\\main\\java\\copper bar2.png")) {
+                    list4.add("\nBakır sandık " + row + "," + col + " konumundan toplandı.");
+                }
+                finallist.addAll(list1);
+                finallist.addAll(list2);
+                finallist.addAll(list3);
+                finallist.addAll(list4);
+                JOptionPane.showMessageDialog(this, "Toplam Adım Sayısı: " + steps + "\n" + (finallist), "Bulunan Hazineler", JOptionPane.INFORMATION_MESSAGE);
+                steps--;
+                cell.setBackground(new Color(211, 211, 211));
+            } else {
+                if (a.contains("defaultIcon=src\\main\\java\\bronze bar2.png")) {
+                    list1.add("\nAltın sandık " + row + "," + col + " konumundan toplandı.");
+                } else if (a.contains("defaultIcon=src\\main\\java\\iron bar2.png")) {
+                    list2.add("\nGümüş sandık " + row + "," + col + " konumundan toplandı.");
+                } else if (a.contains("defaultIcon=src\\main\\java\\badge green2.png")) {
+                    list3.add("\nZümrüt sandık " + row + "," + col + " konumundan toplandı.");
+                } else if (a.contains("defaultIcon=src\\main\\java\\copper bar2.png")) {
+                    list4.add("\nBakır sandık " + row + "," + col + " konumundan toplandı.");
+                }
+                steps--;
+                cell.setBackground(new Color(211, 211, 211));
+            }
+
+            for (Component component : components) {
+                if (component instanceof JLabel) {
+                    cell.remove(component);
+                }
+            }
+            cell.revalidate();
+            cell.repaint();
+        }
+    }
+
+    public class MovingObstacle {
+
+        public int row;
+        public int col;
+        public int direction; 
+        public int verticalMovement;
+        public JPanel[][] cells;
+        public JLabel[][] obstacleLabels;
+
+        public MovingObstacle(int row, int col, JPanel[][] cells) {
+            this.row = row;
+            this.col = col;
+            this.cells = cells;
+            this.direction = 1; 
+            this.verticalMovement = 0; 
+
+            obstacleLabels = new JLabel[2][2];
+
+            ImageIcon obstacleIcon = new ImageIcon("src\\main\\java\\Bee2.png");
+
+            for (int i = 0; i < 2; i++) {
+                for (int j = 0; j < 2; j++) {
+                    obstacleLabels[i][j] = new JLabel(obstacleIcon);
+                    cells[row + i][col + j].setLayout(new BorderLayout());
+                    cells[row + i][col + j].add(obstacleLabels[i][j], BorderLayout.CENTER);
+                }
+            }
+        }
+
+        public void move() {
+            if (verticalMovement < 3) {
+                verticalMovement++;
+            } else { 
+                direction = 1 - direction; 
+                verticalMovement = 0; 
+            }
+
+            int newRow = row + (direction == 0 ? -1 : 1);
+            int newCol = col;
+
+            if (newRow >= 0 && newRow + 1 < cells.length && !isObstacleCell(newRow, newCol)
+                    && !isObstacleCell(newRow + 1, newCol)) {
+                for (int i = 0; i < 2; i++) {
+                    for (int j = 0; j < 2; j++) {
+                        cells[row + i][col + j].setBackground(Color.RED); 
+                        cells[row + i][col + j].remove(obstacleLabels[i][j]); 
+                    }
+                }
+                row = newRow; 
+
+                for (int i = 0; i < 2; i++) {
+                    for (int j = 0; j < 2; j++) {
+                        cells[row + i][col + j].setBackground(Color.WHITE); 
+                        cells[row + i][col + j].add(obstacleLabels[i][j], BorderLayout.CENTER); 
+                        cells[row + i][col + j].revalidate(); 
+                        cells[row + i][col + j].repaint(); 
+                    }
+                }
+
+            }
+        }
+
+        public int getRow() {
+            return row;
+        }
+
+        public int getCol() {
+            return col;
+        }
+    }
+
+    public class MovingObstacle2 {
+
+        public int row;
+        public int col;
+        public int direction; 
+        public int horizontalMovement; 
+        public JPanel[][] cells;
+        public JLabel obstacleLabels[][];
+
+        private Random random;
+
+        public MovingObstacle2(int row, int col, JPanel[][] cells) {
+            this.row = row;
+            this.col = col;
+            this.cells = cells;
+            this.random = new Random();
+            this.direction = 1; 
+            this.horizontalMovement = 0; 
+            ImageIcon obstacleIcon = new ImageIcon("src\\main\\java\\Pigeon.png"); 
+
+            obstacleLabels = new JLabel[2][2];
+
+            for (int i = 0; i < 2; i++) {
+                for (int j = 0; j < 2; j++) {
+                    obstacleLabels[i][j] = new JLabel(obstacleIcon);
+                    cells[row + i][col + j].setLayout(new BorderLayout());
+                    cells[row + i][col + j].add(obstacleLabels[i][j], BorderLayout.CENTER);
+                }
+            }
+        }
+
+        public void move() {
+            if (horizontalMovement < 1) {
+                horizontalMovement++;
+            } else {
+                direction = 1 - direction;
+                horizontalMovement = 0;
+            }
+
+            int newCol = col + (direction == 0 ? -1 : 1);
+            if (newCol >= 0 && newCol + 1 < cells[0].length && !isObstacleCell(row, newCol)
+                    && !isObstacleCell(row + 1, newCol)) {
+
+                if (isOccupiedByMovingObstacle(row, newCol)) {
+
+                    do {
+                        newCol = random.nextInt(cells[0].length);
+                    } while (isOccupiedByMovingObstacle(row, newCol) || isObstacleCell(row, newCol));
+                }
+
+                for (int i = 0; i < 2; i++) {
+                    for (int j = 0; j < 2; j++) {
+                        cells[row + i][col + j].setBackground(Color.RED);
+                        cells[row + i][col + j].remove(obstacleLabels[i][j]);
+                    }
+                }
+
+                col = newCol; 
+
+                
+                for (int i = 0; i < 2; i++) {
+                    for (int j = 0; j < 2; j++) {
+                        cells[row + i][col + j].setBackground(Color.WHITE);
+                        cells[row + i][col + j].add(obstacleLabels[i][j], BorderLayout.CENTER);
+                        cells[row + i][col + j].revalidate();
+                        cells[row + i][col + j].repaint();
+                    }
+                }
+            }
+        }
+
+        public int getRow() {
+            return row;
+        }
+
+        public int getCol() {
+            return col;
+        }
+    }
+
+    public int orangeCount() {
+        int x = 0;
+        for (int i = 0; i < cells.length; i++) {
+            for (int j = 0; j < cells[0].length; j++) {
+                if (cells[i][j].getBackground().equals(Color.ORANGE)) {
+                    x++;
+                }
+            }
+        }
+        return x;
+    }
+
+    private List<Node> findPathToNearestTreasure(Node startNode) {
+        PriorityQueue<Node> openList = new PriorityQueue<>();
+        Map<Integer, Node> openMap = new HashMap<>();
+        List<Node> closedList = new ArrayList<>();
+        openList.add(startNode);
+        openMap.put(startNode.getRow() * cells[0].length + startNode.getCol(), startNode);
+
+        while (!openList.isEmpty()) {
+            Node currentNode = openList.poll();
+            openMap.remove(currentNode.getRow() * cells[0].length + currentNode.getCol());
+            closedList.add(currentNode);
+
+            if (cells[currentNode.getRow()][currentNode.getCol()].getBackground().equals(Color.ORANGE)) {
+                List<Node> path = new ArrayList<>();
+                while (currentNode != null) {
+                    path.add(currentNode);
+                    currentNode = currentNode.getParent();
+                }
+                Collections.reverse(path);
+                return path;
+            }
+
+            List<Node> neighbors = new ArrayList<>();
+            int[] dr = {-1, 1, 0, 0}; 
+            int[] dc = {0, 0, -1, 1};
+            for (int i = 0; i < 4; i++) {
+                int newRow = currentNode.getRow() + dr[i];
+                int newCol = currentNode.getCol() + dc[i];
+                if (isValidCell(newRow, newCol) && occupied[newRow][newCol] == 0) {
+                    Node neighbor = new Node(newRow, newCol);
+                    neighbor.setParent(currentNode);
+                    neighbor.setGValue(currentNode.getGValue() + 1);
+                    neighbors.add(neighbor);
+                }
+            }
+
+            for (Node neighbor : neighbors) {
+                if (closedList.contains(neighbor)) {
+                    continue;
+                }
+
+                if (!openMap.containsKey(neighbor.getRow() * cells[0].length + neighbor.getCol())) {
+                    openList.add(neighbor);
+                    openMap.put(neighbor.getRow() * cells[0].length + neighbor.getCol(), neighbor);
+                } else {
+                    Node openNode = openMap.get(neighbor.getRow() * cells[0].length + neighbor.getCol());
+                    if (openNode.getGValue() > neighbor.getGValue()) {
+                        openNode.setGValue(neighbor.getGValue());
+                        openNode.setParent(currentNode);
+                    }
+                }
+            }
+        }
+
+        return new ArrayList<>();
+    }
+
+    private void movePlayerAlongPath(List<Node> path) {
+        for (Node node : path) {
+            markCellAsVisited(playerRow, playerCol); 
+            movePlayer(node.getRow(), node.getCol()); 
+            try {
+                Thread.sleep(0);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private boolean isValidCell(int row, int col) {
+        return row >= 0 && row < cells.length && col >= 0 && col < cells[0].length;
+    }
+
+    private void markCellAsVisited(int row, int col) {
+        JPanel cell = cells[row][col];
+        cell.setBackground(Color.GREEN);
+    }
+
+    private void makeCellsAroundPlayerVisible(int row, int col) {
+        int startRow = Math.max(0, row - 2);
+        int endRow = Math.min(cells.length - 1, row + 2);
+        int startCol = Math.max(0, col - 2);
+        int endCol = Math.min(cells[0].length - 1, col + 2);
+
+        for (int i = startRow; i <= endRow; i++) {
+            for (int j = startCol; j <= endCol; j++) {
+                cells[i][j].setVisible(true);
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            JFrame frame = new JFrame("Hazine Avcısı Oyunu");
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.setLocationRelativeTo(null);
+
+            JLabel titleLabel = new JLabel("Hazine Avcısı Oyunu", SwingConstants.CENTER);
+            titleLabel.setFont(new Font("Arial", Font.BOLD, 20)); 
+         
+            JButton startButton = new JButton("Başlat");
+            startButton.setPreferredSize(new Dimension(150, 30)); 
+
+            JButton newButton = new JButton("Yeni Harita Oluştur");
+            newButton.setPreferredSize(new Dimension(150, 30));
+
+            startButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    int rows = Integer.parseInt(JOptionPane.showInputDialog("Satır Sayısı: "));
+                    int cols = Integer.parseInt(JOptionPane.showInputDialog("Sütun Sayısı: "));
+                    OyunHarita game = new OyunHarita(rows, cols, true);
+                    game.setExtendedState(MAXIMIZED_BOTH);
+                    game.setVisible(true);
+
+                    new Thread(() -> {
+                        while (game.orangeCount() > 0) {
+                            Node startNode = new Node(game.playerRow, game.playerCol);
+                            java.util.List<Node> path = game.findPathToNearestTreasure(startNode);
+                            game.movePlayerAlongPath(path);
+
+                            try {
+                                Thread.sleep(0);
+                            } catch (InterruptedException ex) {
+                                ex.printStackTrace();
+                            }
+                        }
+                    }).start();
+                }
+            });
+            newButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    int rows = Integer.parseInt(JOptionPane.showInputDialog("Satır Sayısı: "));
+                    int cols = Integer.parseInt(JOptionPane.showInputDialog("Sütun Sayısı: "));
+                    OyunHarita game = new OyunHarita(rows, cols, false);
+                    game.setExtendedState(MAXIMIZED_BOTH);
+                    game.setVisible(true);
+                }
+            });
+            JPanel mainPanel = new JPanel(new BorderLayout());
+            mainPanel.add(titleLabel, BorderLayout.CENTER); 
+            JPanel buttonPanel = new JPanel(new FlowLayout());
+            buttonPanel.add(startButton);
+            buttonPanel.add(newButton);
+
+            mainPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+            frame.add(mainPanel);
+            frame.setSize(500, 300);
+            frame.setLocationRelativeTo(null);
+            frame.setVisible(true);
+        });
+    }
+}
